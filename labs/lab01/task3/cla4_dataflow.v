@@ -1,19 +1,4 @@
-// cla4_dataflow.v
-// The same 4-bit CLA as cla4.v, rewritten using dataflow modeling
-// (continuous `assign` statements) instead of gate primitives. Compare
-// the line count and readability of this file to cla4.v.
-//
-// TODO: add a delay to every assign statement (e.g. assign #(2) ...) --
-// same default-delay expectation as everywhere else from Task 2 onward.
-//   assign #(2) p = a ^ b;
-//   assign #(2) g = a & b;
-//   assign #(2) c1   = g[0] | (p[0] & cin);
-//   assign #(2) c2   = g[1] | (p[1] & g[0]) | (p[1] & p[0] & cin);
-//   assign #(2) c3   = ... (same pattern, one more term)
-//   assign #(2) cout = ... (same pattern, one more term)
-//   assign #(2) sum  = p ^ {c3, c2, c1, cin};
-
-module cla4_dataflow(
+module cla4_dataflow (
   input  [3:0] a,
   input  [3:0] b,
   input        cin,
@@ -21,9 +6,26 @@ module cla4_dataflow(
   output       cout
 );
 
-  wire [3:0] p, g;
-  wire c1, c2, c3;
+  wire [3:0] propagate;
+  wire [3:0] generate_bit;
+  wire [4:0] carry;
 
-  // TODO: your dataflow (assign) statements go here.
+  assign propagate    = a ^ b;
+  assign generate_bit = a & b;
+  assign carry[0]     = cin;
+
+  assign carry[1] = generate_bit[0] | (propagate[0] & carry[0]);
+  assign carry[2] = generate_bit[1] | (propagate[1] & generate_bit[0]) |
+                    (propagate[1] & propagate[0] & carry[0]);
+  assign carry[3] = generate_bit[2] | (propagate[2] & generate_bit[1]) |
+                    (propagate[2] & propagate[1] & generate_bit[0]) |
+                    (propagate[2] & propagate[1] & propagate[0] & carry[0]);
+  assign carry[4] = generate_bit[3] | (propagate[3] & generate_bit[2]) |
+                    (propagate[3] & propagate[2] & generate_bit[1]) |
+                    (propagate[3] & propagate[2] & propagate[1] & generate_bit[0]) |
+                    (propagate[3] & propagate[2] & propagate[1] & propagate[0] & carry[0]);
+
+  assign sum  = propagate ^ carry[3:0];
+  assign cout = carry[4];
 
 endmodule
