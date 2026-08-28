@@ -1,25 +1,4 @@
-// cla4.v
-// Gate-level 4-bit carry-lookahead adder, matching the lecture circuit.
-// Every gate needs an explicit delay (constant is fine here, e.g. #(2)) --
-// this is the default from Task 2 onward, not a special step.
-//
-// TODO -- Step 1: generate/propagate signals (one xor + one and per bit)
-//   p[i] = a[i] ^ b[i]
-//   g[i] = a[i] & b[i]
-//
-// TODO -- Step 2: direct (non-recursive) carry equations. Verilog's and/or
-// primitives accept more than 2 inputs directly, e.g.:
-//   and #(2) (t2, p1, p0, g0);
-// so you do not need to manually chain 2-input gates.
-//   c1 = g0 + p0.cin
-//   c2 = g1 + p1.g0 + p1.p0.cin
-//   c3 = g2 + p2.g1 + p2.p1.g0 + p2.p1.p0.cin
-//   c4 = g3 + p3.g2 + p3.p2.g1 + p3.p2.p1.g0 + p3.p2.p1.p0.cin
-//
-// TODO -- Step 3: sum bits
-//   sum[i] = p[i] ^ c[i]     (c0 = cin)
-
-module cla4(
+module cla4 (
   input  [3:0] a,
   input  [3:0] b,
   input        cin,
@@ -27,11 +6,46 @@ module cla4(
   output       cout
 );
 
-  wire p0, p1, p2, p3;
-  wire g0, g1, g2, g3;
-  wire c1, c2, c3;
+  wire [3:0] propagate;
+  wire [3:0] generate_bit;
+  wire [4:0] carry;
+  wire c1_from_cin;
+  wire c2_from_g0, c2_from_cin;
+  wire c3_from_g1, c3_from_g0, c3_from_cin;
+  wire cout_from_g2, cout_from_g1, cout_from_g0, cout_from_cin;
+  genvar bit_index;
 
-  // TODO: your gate-level P/G, carry, and sum logic goes here.
-  // (cout should be connected to c4.) Remember the delay on every gate.
+  assign carry[0] = cin;
 
+  generate
+    for (bit_index = 0; bit_index < 4; bit_index = bit_index + 1) begin : propagate_generate
+      xor (propagate[bit_index],    a[bit_index], b[bit_index]);
+      and (generate_bit[bit_index], a[bit_index], b[bit_index]);
+    end
+  endgenerate
+
+  and (c1_from_cin, carry[0], propagate[0]);
+  or  (carry[1], generate_bit[0], c1_from_cin);
+
+  and (c2_from_g0,  propagate[1], generate_bit[0]);
+  and (c2_from_cin, propagate[1], propagate[0], carry[0]);
+  or  (carry[2], generate_bit[1], c2_from_g0, c2_from_cin);
+
+  and (c3_from_g1,  propagate[2], generate_bit[1]);
+  and (c3_from_g0,  propagate[2], propagate[1], generate_bit[0]);
+  and (c3_from_cin, propagate[2], propagate[1], propagate[0], carry[0]);
+  or  (carry[3], generate_bit[2], c3_from_g1, c3_from_g0, c3_from_cin);
+
+  and (cout_from_g2,  propagate[3], generate_bit[2]);
+  and (cout_from_g1,  propagate[3], propagate[2], generate_bit[1]);
+  and (cout_from_g0,  propagate[3], propagate[2], propagate[1], generate_bit[0]);
+  and (cout_from_cin, propagate[3], propagate[2], propagate[1], propagate[0], carry[0]);
+  or  (carry[4], generate_bit[3], cout_from_g2, cout_from_g1, cout_from_g0, cout_from_cin);
+
+  xor (sum[0], propagate[0], carry[0]);
+  xor (sum[1], propagate[1], carry[1]);
+  xor (sum[2], propagate[2], carry[2]);
+  xor (sum[3], propagate[3], carry[3]);
+
+  assign cout = carry[4];
 endmodule
